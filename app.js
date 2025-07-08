@@ -16,7 +16,10 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
 app.use(cors({
-  origin: 'https://pogooooo.github.io/team_auction',
+  origin: [
+      'http://localhost:5173',
+      'https://pogooooo.github.io/team_auction/',
+  ],
   credentials: true
 }))
 
