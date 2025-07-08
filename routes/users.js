@@ -116,7 +116,7 @@ router.delete('/delete', function(req, res, next) {
 router.put('/update/champ', function (req, res, next) {
     const { nickname, line, champ } = req.body;
 
-    if (!nickname || !line || !champ) {
+    if (!nickname || !line || champ === undefined) {
         return res.status(400).json({ error: 'please check field' });
     }
 
