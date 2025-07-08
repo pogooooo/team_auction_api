@@ -18,7 +18,7 @@ app.set('view engine', 'pug');
 app.use(cors({
   origin: [
       'http://localhost:5173',
-      'https://team-auction.vercel.app/',
+      'https://team-auction.vercel.app',
   ],
   credentials: true
 }))
