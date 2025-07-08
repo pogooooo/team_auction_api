@@ -122,6 +122,21 @@ router.delete('/participant/delete', function(req, res, next) {
     );
 });
 
+//reset participant
+router.delete('/participant/reset', function(req, res, next) {
+    db.run(`DELETE FROM game`, [], function(err) {
+        if (err) {
+            console.error('failed to reset game table:', err.message);
+            return res.status(500).json({ error: 'failed to reset game table' });
+        }
+
+        webSocket.broadcast('PARTICIPANT_UPDATE');
+
+        console.log('successfully reset game table (all participants deleted)');
+        res.json({ message: 'all participants deleted', deleted: this.changes });
+    });
+});
+
 //edit team
 router.put('/participant/edit/team', function(req, res, next) {
     const { nickname, team } = req.body;
