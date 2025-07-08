@@ -4,6 +4,7 @@ var router = express.Router();
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { wss } = require('../app');
+const webSocket = require("../bin/wsServer");
 
 const dbPath = path.join(__dirname, './database/auction.db');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -13,10 +14,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // create user database table
 db.run(`CREATE TABLE IF NOT EXISTS user (
-  nickname TEXT not null,
-  line TEXT,
-  tier TEXT,
-  champ TEXT
+    nickname TEXT not null,
+    line TEXT,
+    tier TEXT,
+    champ TEXT,
+    leader_count INTEGER DEFAULT 0,
+    participant_count INTEGER DEFAULT 0,
+    win_count INTEGER DEFAULT 0
 )`, (err) => {
   if (err) {console.error('user table connect failed', err.message);}
   else {console.log('user table connect successfully');}
@@ -71,11 +75,7 @@ router.post('/add', function(req, res, next) {
           return res.status(500).json({error: 'failed to insert data'})
         }
 
-        wss.clients.forEach(client => {
-          if (client.readyState === client.OPEN) {
-              client.send(JSON.stringify({ type: 'USER_UPDATED' }));
-          }
-        });
+          webSocket.broadcast('USER_UPDATE')
 
         console.log(`successfully added user data in ${this.lastID}`);
         res.json({message: 'success', id:this.lastID})
@@ -104,11 +104,7 @@ router.delete('/delete', function(req, res, next) {
           return res.status(404).json({error: 'not exist data to delete'})
         }
 
-        wss.clients.forEach(client => {
-          if (client.readyState === client.OPEN) {
-              client.send(JSON.stringify({ type: 'USER_UPDATED' }));
-          }
-        });
+        webSocket.broadcast('USER_UPDATE')
 
         console.log(`success to delete user data : ${nickname}, ${line}`)
         res.json({message: 'success'})
@@ -116,37 +112,62 @@ router.delete('/delete', function(req, res, next) {
   )
 })
 
-//update user data
-router.put('/update', function(req, res, next) {
-  const {nickname, line, tier, champ} = req.body
+// update champ
+router.put('/update/champ', function (req, res, next) {
+    const { nickname, line, champ } = req.body;
 
-  if (!nickname || !line || !tier || !champ) {
-    return res.status(400).json({error:'please check field'})
-  }
+    if (!nickname || !line || !champ) {
+        return res.status(400).json({ error: 'please check field' });
+    }
 
-  db.run(
-      'UPDATE user SET tier=?, champ=?, WHERE nickname=? AND line=?',
-      [nickname, line, tier, champ],
-      function(err){
-        if(err){
-          console.log('filed to update user data : ', err.meddage)
-          return res.status(500).json({error: 'failed update'})
+    db.run(
+        'UPDATE user SET champ=? WHERE nickname=? AND line=?',
+        [champ, nickname, line],
+        function (err) {
+            if (err) {
+                console.error('failed to update champ: ', err.message);
+                return res.status(500).json({ error: 'failed to update champ' });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'not exist data to update' });
+            }
+
+            webSocket.broadcast('USER_UPDATE')
+
+            console.log(`successfully updated champ for ${nickname}, ${line}`);
+            res.json({ message: 'success' });
         }
+    );
+});
 
-        if(this.changes === 0) {
-          return res.status(404).json({error: 'not exist data to update'})
+// update tier
+router.put('/update/tier', function (req, res, next) {
+    const { nickname, line, tier } = req.body;
+
+    if (!nickname || !line || !tier) {
+        return res.status(400).json({ error: 'please check field' });
+    }
+
+    db.run(
+        'UPDATE user SET tier=? WHERE nickname=? AND line=?',
+        [tier, nickname, line],
+        function (err) {
+            if (err) {
+                console.error('failed to update tier: ', err.message);
+                return res.status(500).json({ error: 'failed to update tier' });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'not exist data to update' });
+            }
+
+            webSocket.broadcast('USER_UPDATE')
+
+            console.log(`successfully updated tier for ${nickname}, ${line}`);
+            res.json({ message: 'success' });
         }
-
-        wss.clients.forEach(client => {
-          if (client.readyState === client.OPEN) {
-              client.send(JSON.stringify({ type: 'USER_UPDATED' }));
-          }
-        });
-
-        console.log(`successfully update user data : ${nickname},${line}`)
-        res.json({message: 'success'})
-      }
-  )
-})
+    );
+});
 
 module.exports = router;

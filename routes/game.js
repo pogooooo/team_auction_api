@@ -15,7 +15,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // create game database table
 db.run(`CREATE TABLE IF NOT EXISTS game (
-    nickname TEXT not null,
+    nickname TEXT PRIMARY KEY,
     line TEXT,
     tier TEXT,
     champ TEXT,
@@ -122,6 +122,35 @@ router.delete('/participant/delete', function(req, res, next) {
     );
 });
 
+//edit team
+router.put('/participant/edit/team', function(req, res, next) {
+    const { nickname, team } = req.body;
+
+    if (!nickname || !team) {
+        return res.status(400).json({ error: 'please provide nickname and team' });
+    }
+
+    db.run(
+        `UPDATE game SET team = ? WHERE nickname = ?`,
+        [team, nickname],
+        function(err) {
+            if (err) {
+                console.error('failed to update team:', err.message);
+                return res.status(500).json({ error: 'failed to update team' });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'no matching data to update' });
+            }
+
+            webSocket.broadcast('PARTICIPANT_UPDATE');
+
+            console.log(`successfully updated team for nickname=${nickname} to ${team}`);
+            res.json({ message: 'team update success', updated: this.changes });
+        }
+    );
+});
+
 //edit line
 router.put('/participant/edit/line', function(req, res, next) {
     const { nickname, line } = req.body;
@@ -180,8 +209,8 @@ router.put('/participant/edit/leader', function(req, res, next) {
 
     db.serialize(() => {
         db.run(
-            `UPDATE game SET leader = 1 WHERE nickname = ?`,
-            [nickname],
+            `UPDATE game SET leader = 1, team = ? WHERE nickname = ?`,
+            [nickname, nickname],
             function(err) {
                 if (err) {
                     console.error('failed to set leader:', err.message);
@@ -224,7 +253,7 @@ router.put('/participant/edit/unleader', function(req, res, next) {
 
     db.serialize(() => {
         db.run(
-            `UPDATE game SET leader = 0 WHERE nickname = ?`,
+            `UPDATE game SET leader = 0, team = null WHERE nickname = ?`,
             [nickname],
             function(err) {
                 if (err) {

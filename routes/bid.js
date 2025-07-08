@@ -10,6 +10,28 @@ const db = new sqlite3.Database(dbPath, (err) => {
     else {console.log('db connect successfully');}
 })
 
+function resetTargetsIfFinished() {
+    const entries = Object.entries(targets);
+
+    if (entries.length === 0) return; // 아무것도 없으면 셔플할 필요 없음
+
+    if (currentOrder >= entries.length) {
+        currentOrder = 0;
+
+        // Fisher-Yates 셔플
+        for (let i = entries.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [entries[i], entries[j]] = [entries[j], entries[i]];
+        }
+
+        targets = Object.fromEntries(entries);
+
+        console.log('🔁 타겟 순서가 초기화 및 셔플되었습니다.');
+        webSocket.broadcast('TARGET_UPDATE');
+        webSocket.broadcast('ORDER_UPDATE');
+    }
+}
+
 let targets = {}
 let currentOrder = 0
 let bidderName = {}
@@ -55,6 +77,7 @@ router.post('/target', function(req, res) {
 
             // 변경 메세지
             webSocket.broadcast('TARGET_UPDATE')
+            return res.status(200).json({ success: true, targets });
         }
     );
 });
@@ -76,6 +99,8 @@ router.post('/target/sell', function(req, res) {
     // 데이터 업데이트 메시지 전송
     webSocket.broadcast('TARGET_UPDATE');
 
+    resetTargetsIfFinished();
+
     res.json({ message: 'Target sold', removed: { [removedKey]: removedValue } });
 });
 
@@ -93,7 +118,9 @@ router.post('/state', function(req, res) {
     }
 
     currentOrder = order;
-    webSocket.broadcast('DATA_UPDATE');
+    webSocket.broadcast('ORDER_UPDATE');
+
+    resetTargetsIfFinished();
 
     res.json({ message: 'currentOrder updated', currentOrder });
 });
@@ -119,9 +146,16 @@ router.post('/bidder', function(req, res) {
         point: point
     };
 
-    webSocket.broadcast('DATA_UPDATE');
+    webSocket.broadcast('BIDDER_UPDATE');
 
     res.json({ message: 'bidder updated', bidder: bidderName });
 });
+
+//clear bidder name
+router.post('/bidder/clear', function(req, res, next) {
+    bidderName = {}
+    res.json({message:'bidder clear : ', bidder: bidderName });
+    webSocket.broadcast('BIDDER_UPDATE');
+})
 
 module.exports = router;
