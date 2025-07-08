@@ -90,8 +90,7 @@ router.post('/target/sell', function(req, res) {
         return res.status(400).json({ error: 'No targets to sell' });
     }
 
-    // 첫 번째 항목 제거
-    const [removedKey, removedValue] = entries.shift();
+    const [removedKey, removedValue] = entries.splice(currentOrder, 1)[0];
 
     // 다시 객체로 변환
     targets = Object.fromEntries(entries);

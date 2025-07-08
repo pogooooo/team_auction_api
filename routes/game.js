@@ -122,18 +122,32 @@ router.delete('/participant/delete', function(req, res, next) {
     );
 });
 
-//reset participant
+//reset all
 router.delete('/participant/reset', function(req, res, next) {
-    db.run(`DELETE FROM game`, [], function(err) {
-        if (err) {
-            console.error('failed to reset game table:', err.message);
-            return res.status(500).json({ error: 'failed to reset game table' });
-        }
+    db.serialize(() => {
+        db.run(`DELETE FROM game`, [], function(err) {
+            if (err) {
+                console.error('failed to reset game table:', err.message);
+                return res.status(500).json({ error: 'failed to reset game table' });
+            }
 
-        webSocket.broadcast('PARTICIPANT_UPDATE');
+            console.log(`successfully reset game table (deleted ${this.changes} rows)`);
 
-        console.log('successfully reset game table (all participants deleted)');
-        res.json({ message: 'all participants deleted', deleted: this.changes });
+            db.run(`DELETE FROM leader`, [], function(err2) {
+                if (err2) {
+                    console.error('failed to reset leader table:', err2.message);
+                    return res.status(500).json({ error: 'failed to reset leader table' });
+                }
+
+                console.log(`successfully reset leader table (deleted ${this.changes} rows)`);
+
+                // broadcast updates
+                webSocket.broadcast('PARTICIPANT_UPDATE');
+                webSocket.broadcast('LEADER_UPDATE');
+
+                res.json({ message: 'all participants and leaders deleted' });
+            });
+        });
     });
 });
 
